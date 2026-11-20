@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Register - RoadCare AI{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="form-card">
+        <div class="text-center mb-4">
+          <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px">
+            <i class="fas fa-user-plus text-success fa-xl"></i>
+          </div>
+          <h3 class="fw-bold">Create Account</h3>
+          <p class="text-muted">Join RoadCare AI as a citizen</p>
+        </div>
+        <form method="POST">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Full Name</label>
+              <input type="text" class="form-control" name="full_name" required placeholder="Your full name">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Username</label>
+              <input type="text" class="form-control" name="username" required placeholder="Choose a username">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Email Address</label>
+              <input type="email" class="form-control" name="email" required placeholder="your@email.com">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Phone Number</label>
+              <input type="tel" class="form-control" name="phone" placeholder="10-digit number">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Password</label>
+              <input type="password" class="form-control" name="password" required placeholder="Minimum 6 characters">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success w-100 py-2 fw-semibold mt-4">
+            <i class="fas fa-user-plus me-2"></i>Register
+          </button>
+        </form>
+        <div class="text-center mt-3">
+          <p class="text-muted">Already have an account? <a href="{{ url_for('login') }}" class="text-primary fw-semibold">Login</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

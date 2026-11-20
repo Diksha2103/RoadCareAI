@@ -1,0 +1,159 @@
+{% extends 'admin/base.html' %}
+{% block title %}Complaints - Admin RoadCare AI{% endblock %}
+{% block page_title %}<i class="fas fa-clipboard-list me-2 text-primary"></i>Complaint Management{% endblock %}
+
+{% block content %}
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <form method="GET" class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small fw-semibold mb-1">Search by Complaint ID</label>
+      <div class="input-group input-group-sm">
+        <span class="input-group-text"><i class="fas fa-search text-muted"></i></span>
+        <input type="text" class="form-control" name="search_id" value="{{ filters.search_id }}" placeholder="e.g. RC202400001">
+      </div>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold mb-1">Severity</label>
+      <select class="form-select form-select-sm" name="severity">
+        <option value="">All Severities</option>
+        {% for s in severities %}
+        <option value="{{ s }}" {% if filters.severity == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold mb-1">Damage Type</label>
+      <select class="form-select form-select-sm" name="damage_type">
+        <option value="">All Types</option>
+        {% for dt in damage_types %}
+        <option value="{{ dt }}" {% if filters.damage_type == dt %}selected{% endif %}>{{ dt }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold mb-1">Status</label>
+      <select class="form-select form-select-sm" name="status">
+        <option value="">All Statuses</option>
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3 d-flex gap-2">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+        <i class="fas fa-filter me-1"></i>Apply Filters
+      </button>
+      <a href="{{ url_for('admin_complaints') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-times"></i>
+      </a>
+    </div>
+  </form>
+</div>
+
+<!-- Results Info -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <span class="text-muted small">
+    Showing <strong>{{ complaints.items|length }}</strong> of <strong>{{ complaints.total }}</strong> complaints
+  </span>
+  <span class="text-muted small">Page {{ complaints.page }} of {{ complaints.pages }}</span>
+</div>
+
+<!-- Complaints Table -->
+<div class="admin-table mb-4">
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Complaint ID</th>
+          <th>Reporter</th>
+          <th>Damage Type</th>
+          <th>Severity</th>
+          <th>AI Confidence</th>
+          <th>Location</th>
+          <th>Status</th>
+          <th>Department</th>
+          <th>Date</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in complaints.items %}
+        <tr>
+          <td class="text-muted small">{{ loop.index + (complaints.page-1)*15 }}</td>
+          <td><span class="fw-semibold text-primary">{{ c.complaint_id }}</span></td>
+          <td>
+            <div class="fw-semibold small">{{ c.reporter_name or '—' }}</div>
+            <div class="text-muted" style="font-size:0.72rem">{{ c.reporter_email or '' }}</div>
+          </td>
+          <td><span class="badge bg-light text-dark border small">{{ c.damage_type }}</span></td>
+          <td><span class="status-badge severity-{{ c.severity.lower() }}">{{ c.severity }}</span></td>
+          <td>
+            {% if c.ai_confidence %}
+            <div class="d-flex align-items-center gap-1">
+              <div class="progress flex-grow-1" style="height:6px;width:60px">
+                <div class="progress-bar bg-success" style="width:{{ (c.ai_confidence * 100)|int }}%"></div>
+              </div>
+              <span class="small text-muted">{{ (c.ai_confidence * 100)|int }}%</span>
+            </div>
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-muted small" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ c.address }}">
+            {{ c.address or '—' }}
+          </td>
+          <td>
+            <span class="status-badge status-{{ c.status.lower().replace(' ','-') }}">{{ c.status }}</span>
+          </td>
+          <td class="small text-muted">{{ c.assigned_department or '—' }}</td>
+          <td class="text-muted small">{{ c.created_at.strftime('%d %b %Y') }}</td>
+          <td>
+            <a href="{{ url_for('admin_complaint_detail', complaint_pk=c.id) }}" class="btn btn-primary btn-sm">
+              <i class="fas fa-eye me-1"></i>View
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="11" class="text-center py-5 text-muted">
+            <i class="fas fa-inbox fa-2x mb-2"></i><br>No complaints found matching your filters.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pagination -->
+{% if complaints.pages > 1 %}
+<nav>
+  <ul class="pagination justify-content-center">
+    {% if complaints.has_prev %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('admin_complaints', page=complaints.prev_num, **filters) }}">
+        <i class="fas fa-chevron-left"></i>
+      </a>
+    </li>
+    {% endif %}
+    {% for p in complaints.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        <li class="page-item {% if p == complaints.page %}active{% endif %}">
+          <a class="page-link" href="{{ url_for('admin_complaints', page=p, **filters) }}">{{ p }}</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+    {% if complaints.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('admin_complaints', page=complaints.next_num, **filters) }}">
+        <i class="fas fa-chevron-right"></i>
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

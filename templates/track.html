@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+{% block title %}Track Complaint - RoadCare AI{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="text-center mb-4">
+        <h2 class="fw-bold">Track Your Complaint</h2>
+        <p class="text-muted">Enter your complaint ID to check the current status and repair updates.</p>
+      </div>
+
+      <!-- Search Form -->
+      <div class="form-card mb-4">
+        <form method="GET" class="d-flex gap-2">
+          <input type="text" class="form-control form-control-lg" name="complaint_id"
+                 value="{{ complaint_id }}" placeholder="Enter Complaint ID (e.g. RC202400001)">
+          <button type="submit" class="btn btn-primary btn-lg px-4">
+            <i class="fas fa-search"></i>
+          </button>
+        </form>
+      </div>
+
+      {% if complaint %}
+      <!-- Complaint Details -->
+      <div class="form-card mb-4">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+          <div>
+            <h4 class="fw-bold text-primary mb-0">{{ complaint.complaint_id }}</h4>
+            <small class="text-muted">Filed on {{ complaint.created_at.strftime('%d %b %Y, %I:%M %p') }}</small>
+          </div>
+          <span class="badge badge-{{ complaint.status.lower().replace(' ','-') }} px-3 py-2 fs-6 rounded-pill">
+            {{ complaint.status }}
+          </span>
+        </div>
+        <hr>
+
+        <div class="row g-4">
+          <!-- Left: Details -->
+          <div class="col-md-7">
+            <h6 class="fw-semibold text-muted text-uppercase small mb-3">Complaint Details</h6>
+            <table class="table table-borderless table-sm">
+              <tr>
+                <td class="text-muted" width="40%"><i class="fas fa-road me-2"></i>Damage Type</td>
+                <td class="fw-semibold">{{ complaint.damage_type }}</td>
+              </tr>
+              <tr>
+                <td class="text-muted"><i class="fas fa-signal me-2"></i>Severity</td>
+                <td class="fw-semibold sev-{{ complaint.severity.lower() }}">{{ complaint.severity }}</td>
+              </tr>
+              <tr>
+                <td class="text-muted"><i class="fas fa-map-marker-alt me-2"></i>Location</td>
+                <td>{{ complaint.address or 'Not specified' }}</td>
+              </tr>
+              {% if complaint.landmark %}
+              <tr>
+                <td class="text-muted"><i class="fas fa-landmark me-2"></i>Landmark</td>
+                <td>{{ complaint.landmark }}</td>
+              </tr>
+              {% endif %}
+              {% if complaint.assigned_department %}
+              <tr>
+                <td class="text-muted"><i class="fas fa-building me-2"></i>Assigned To</td>
+                <td class="fw-semibold text-success">{{ complaint.assigned_department }}</td>
+              </tr>
+              {% endif %}
+            </table>
+
+            {% if complaint.description %}
+            <div class="mt-2">
+              <div class="text-muted small mb-1">Description:</div>
+              <p class="mb-0">{{ complaint.description }}</p>
+            </div>
+            {% endif %}
+
+            <!-- AI Prediction -->
+            <div class="mt-3 p-3 bg-light rounded-3 border">
+              <h6 class="fw-semibold mb-2"><i class="fas fa-robot text-primary me-2"></i>AI Analysis</h6>
+              <div class="row g-2 small">
+                <div class="col-6">
+                  <span class="text-muted">Predicted Type:</span>
+                  <div class="fw-semibold">{{ complaint.ai_damage_type }}</div>
+                </div>
+                <div class="col-6">
+                  <span class="text-muted">Predicted Severity:</span>
+                  <div class="fw-semibold sev-{{ (complaint.ai_severity or '').lower() }}">{{ complaint.ai_severity }}</div>
+                </div>
+                <div class="col-12">
+                  <span class="text-muted">Confidence:</span>
+                  <div class="d-flex align-items-center gap-2 mt-1">
+                    <div class="progress flex-grow-1" style="height:8px">
+                      <div class="progress-bar bg-success" style="width:{{ (complaint.ai_confidence or 0) * 100 }}%"></div>
+                    </div>
+                    <span class="fw-semibold">{{ ((complaint.ai_confidence or 0) * 100)|int }}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Image -->
+          <div class="col-md-5">
+            {% if complaint.image_path %}
+            <h6 class="fw-semibold text-muted text-uppercase small mb-2">Uploaded Photo</h6>
+            <img src="{{ url_for('static', filename=complaint.image_path) }}"
+                 class="img-fluid rounded-3 w-100" style="max-height:220px;object-fit:cover"
+                 alt="Damage photo">
+            {% else %}
+            <div class="bg-light rounded-3 d-flex align-items-center justify-content-center" style="height:160px">
+              <div class="text-center text-muted">
+                <i class="fas fa-image fa-2x mb-2"></i>
+                <div class="small">No photo uploaded</div>
+              </div>
+            </div>
+            {% endif %}
+
+            {% if complaint.admin_remarks %}
+            <div class="mt-3 p-3 bg-warning bg-opacity-10 border border-warning rounded-3">
+              <h6 class="fw-semibold mb-1"><i class="fas fa-comment-dots me-2 text-warning"></i>Admin Remarks</h6>
+              <p class="mb-0 small">{{ complaint.admin_remarks }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Timeline -->
+      <div class="form-card mb-4">
+        <h5 class="fw-semibold mb-4"><i class="fas fa-history me-2 text-primary"></i>Status Timeline</h5>
+        {% set statuses = ['Submitted', 'Under Verification', 'Verified', 'Assigned', 'Repair In Progress', 'Resolved', 'Closed'] %}
+        {% set current_idx = statuses.index(complaint.status) if complaint.status in statuses else 0 %}
+        <div class="timeline">
+          {% for i, s in enumerate(statuses) %}
+          <div class="timeline-item">
+            <div class="timeline-dot {% if i < current_idx %}completed{% elif i > current_idx %}pending{% endif %}"></div>
+            <div class="{% if i > current_idx %}text-muted{% endif %}">
+              <div class="fw-semibold {% if i == current_idx %}text-primary{% endif %}">{{ s }}</div>
+              {% if i == current_idx %}
+                <small class="text-primary">Current Status</small>
+              {% elif i < current_idx %}
+                <small class="text-muted">Completed</small>
+              {% else %}
+                <small class="text-muted">Pending</small>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Repair Updates -->
+      {% if complaint.repair_updates %}
+      <div class="form-card mb-4">
+        <h5 class="fw-semibold mb-4"><i class="fas fa-tools me-2 text-warning"></i>Repair Updates ({{ complaint.repair_updates | length }})</h5>
+        {% for update in complaint.repair_updates | reverse %}
+        <div class="border rounded-3 p-3 mb-3 {% if loop.first %}border-success{% endif %}">
+          <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-1">
+            <span class="badge bg-success px-2 py-1 rounded-pill small">{{ update.status }}</span>
+            <small class="text-muted">
+              <i class="fas fa-calendar me-1"></i>{{ update.update_date.strftime('%d %b %Y') }}
+              &nbsp;|&nbsp;<i class="fas fa-user me-1"></i>{{ update.created_by }}
+            </small>
+          </div>
+          {% if update.remarks %}
+            <p class="mb-2">{{ update.remarks }}</p>
+          {% endif %}
+          {% if update.image_path %}
+            <img src="{{ url_for('static', filename=update.image_path) }}"
+                 class="img-thumbnail" style="max-height:150px" alt="Repair update photo">
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% elif complaint_id %}
+      <div class="alert alert-warning d-flex align-items-center">
+        <i class="fas fa-exclamation-triangle me-2 fa-lg"></i>
+        <div>No complaint found with ID <strong>{{ complaint_id }}</strong>. Please check and try again.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

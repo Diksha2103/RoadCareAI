@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Secrets / config
+.env
+
+# Database (contains user accounts and complaints)
+instance/
+*.db
+*.sqlite3
+
+# User-uploaded photos (personal data); keep the folders via .gitkeep
+static/uploads/*
+!static/uploads/.gitkeep
+!static/uploads/repairs/
+static/uploads/repairs/*
+!static/uploads/repairs/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Testing
+.pytest_cache/
+.coverage

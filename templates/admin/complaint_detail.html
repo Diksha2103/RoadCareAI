@@ -1,0 +1,351 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ complaint.complaint_id }} - Admin RoadCare AI{% endblock %}
+{% block page_title %}
+  <a href="{{ url_for('admin_complaints') }}" class="text-muted me-2 text-decoration-none">
+    <i class="fas fa-arrow-left me-1"></i>Complaints
+  </a>
+  <span class="text-muted">/</span>
+  <span class="ms-2 text-primary fw-semibold">{{ complaint.complaint_id }}</span>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- ── LEFT COLUMN: Complaint Info ───────────────────────────────── -->
+  <div class="col-lg-8">
+
+    <!-- Header -->
+    <div class="detail-card">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+        <div>
+          <h4 class="fw-bold text-primary mb-0">{{ complaint.complaint_id }}</h4>
+          <div class="text-muted small mt-1">
+            <i class="fas fa-calendar me-1"></i>Filed {{ complaint.created_at.strftime('%d %B %Y, %I:%M %p') }}
+            {% if complaint.updated_at %}
+              &nbsp;·&nbsp;<i class="fas fa-sync me-1"></i>Updated {{ complaint.updated_at.strftime('%d %b %Y') }}
+            {% endif %}
+          </div>
+        </div>
+        <span class="status-badge status-{{ complaint.status.lower().replace(' ','-') }}" style="font-size:0.85rem;padding:8px 16px">
+          {{ complaint.status }}
+        </span>
+      </div>
+
+      <!-- Status Workflow -->
+      <div class="p-3 bg-light rounded-3 border">
+        <div class="row g-0">
+          {% set statuses = ['Submitted', 'Under Verification', 'Verified', 'Assigned', 'Repair In Progress', 'Resolved', 'Closed'] %}
+          {% set cur = statuses.index(complaint.status) if complaint.status in statuses else 0 %}
+          {% for i, s in enumerate(statuses) %}
+          <div class="col text-center position-relative">
+            <div class="d-flex flex-column align-items-center">
+              <div style="width:28px;height:28px;border-radius:50%;border:2px solid {% if i < cur %}#10b981{% elif i == cur %}#3b82f6{% else %}#d1d5db{% endif %};background:{% if i <= cur %}{% if i < cur %}#10b981{% else %}#3b82f6{% endif %}{% else %}white{% endif %};display:flex;align-items:center;justify-content:center;font-size:0.65rem;color:{% if i <= cur %}white{% else %}#9ca3af{% endif %};font-weight:600;position:relative;z-index:1">
+                {% if i < cur %}<i class="fas fa-check"></i>{% else %}{{ i+1 }}{% endif %}
+              </div>
+              <div class="mt-1" style="font-size:0.65rem;color:{% if i == cur %}#3b82f6{% elif i < cur %}#10b981{% else %}#9ca3af{% endif %};font-weight:{% if i == cur %}700{% else %}400{% endif %};line-height:1.2;max-width:60px">{{ s }}</div>
+            </div>
+            {% if not loop.last %}
+            <div style="position:absolute;top:14px;left:50%;right:-50%;height:2px;background:{% if i < cur %}#10b981{% else %}#e5e7eb{% endif %};z-index:0"></div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Reporter + Location -->
+    <div class="detail-card">
+      <div class="row g-4">
+        <div class="col-md-6">
+          <div class="section-title"><i class="fas fa-user me-1"></i>Reporter Information</div>
+          <div class="detail-row"><div class="detail-label">Name</div><div class="detail-value">{{ complaint.reporter_name or '—' }}</div></div>
+          <div class="detail-row"><div class="detail-label">Email</div><div class="detail-value">{{ complaint.reporter_email or '—' }}</div></div>
+          <div class="detail-row"><div class="detail-label">Phone</div><div class="detail-value">{{ complaint.reporter_phone or '—' }}</div></div>
+        </div>
+        <div class="col-md-6">
+          <div class="section-title"><i class="fas fa-map-marker-alt me-1"></i>Location</div>
+          <div class="detail-row"><div class="detail-label">Address</div><div class="detail-value">{{ complaint.address or '—' }}</div></div>
+          <div class="detail-row"><div class="detail-label">Landmark</div><div class="detail-value">{{ complaint.landmark or '—' }}</div></div>
+          {% if complaint.latitude and complaint.longitude %}
+          <div class="detail-row"><div class="detail-label">Coordinates</div><div class="detail-value small text-muted">{{ "%.4f"|format(complaint.latitude) }}, {{ "%.4f"|format(complaint.longitude) }}</div></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Damage Details -->
+    <div class="detail-card">
+      <div class="row g-4">
+        <div class="col-md-6">
+          <div class="section-title"><i class="fas fa-road me-1"></i>Damage Details</div>
+          <div class="detail-row">
+            <div class="detail-label">Damage Type</div>
+            <div class="detail-value"><span class="badge bg-light text-dark border">{{ complaint.damage_type }}</span></div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">Severity</div>
+            <div class="detail-value"><span class="status-badge severity-{{ complaint.severity.lower() }}">{{ complaint.severity }}</span></div>
+          </div>
+          {% if complaint.description %}
+          <div class="mt-3">
+            <div class="text-muted small mb-1">Description:</div>
+            <p class="mb-0 small">{{ complaint.description }}</p>
+          </div>
+          {% endif %}
+        </div>
+        <div class="col-md-6">
+          <div class="section-title"><i class="fas fa-robot me-1"></i>AI Analysis</div>
+          <div class="detail-row">
+            <div class="detail-label">Predicted Type</div>
+            <div class="detail-value fw-semibold">{{ complaint.ai_damage_type }}</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">Predicted Severity</div>
+            <div class="detail-value"><span class="status-badge severity-{{ (complaint.ai_severity or '').lower() }}">{{ complaint.ai_severity }}</span></div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">Confidence</div>
+            <div class="detail-value">
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:8px">
+                  <div class="progress-bar bg-success" style="width:{{ (complaint.ai_confidence or 0) * 100 }}%"></div>
+                </div>
+                <strong>{{ ((complaint.ai_confidence or 0) * 100)|int }}%</strong>
+              </div>
+            </div>
+          </div>
+          {% if ai_details %}
+          <details class="mt-2">
+            <summary class="small text-primary cursor-pointer" style="cursor:pointer">View full AI output</summary>
+            <div class="mt-2 p-2 bg-light rounded small font-monospace" style="font-size:0.72rem;max-height:120px;overflow-y:auto">
+              {{ ai_details | tojson(indent=2) | replace('\n','<br>') | safe }}
+            </div>
+          </details>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Image -->
+    {% if complaint.image_path %}
+    <div class="detail-card">
+      <div class="section-title"><i class="fas fa-camera me-1"></i>Submitted Photo</div>
+      <img src="{{ url_for('static', filename=complaint.image_path) }}"
+           class="img-fluid rounded-3 w-100" style="max-height:350px;object-fit:cover;cursor:pointer"
+           onclick="window.open(this.src,'_blank')" alt="Damage photo" title="Click to open full image">
+      <small class="text-muted d-block mt-2"><i class="fas fa-info-circle me-1"></i>Click image to view full size</small>
+    </div>
+    {% endif %}
+
+    <!-- Map -->
+    {% if complaint.latitude and complaint.longitude %}
+    <div class="detail-card">
+      <div class="section-title"><i class="fas fa-map-marked-alt me-1"></i>Location on Map</div>
+      <div id="detailMap" style="height:280px;border-radius:10px"></div>
+    </div>
+    {% endif %}
+
+    <!-- Repair Updates (Citizen visible) -->
+    {% if complaint.repair_updates %}
+    <div class="detail-card">
+      <div class="section-title"><i class="fas fa-tools me-1"></i>Repair Updates ({{ complaint.repair_updates | length }})</div>
+      {% for u in complaint.repair_updates | reverse %}
+      <div class="repair-update-card {% if loop.first %}latest{% endif %}">
+        <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-1">
+          <span class="status-badge status-{{ u.status.lower().replace(' ','-') }}">{{ u.status }}</span>
+          <small class="text-muted">
+            <i class="fas fa-calendar me-1"></i>{{ u.update_date.strftime('%d %b %Y') }}
+            &nbsp;|&nbsp;<i class="fas fa-user me-1"></i>{{ u.created_by }}
+          </small>
+        </div>
+        {% if u.remarks %}<p class="mb-2 small">{{ u.remarks }}</p>{% endif %}
+        {% if u.image_path %}
+        <img src="{{ url_for('static', filename=u.image_path) }}"
+             class="img-thumbnail" style="max-height:160px;cursor:pointer"
+             onclick="window.open(this.src,'_blank')" alt="Repair photo">
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── RIGHT COLUMN: Action Panel ───────────────────────────────── -->
+  <div class="col-lg-4">
+
+    <!-- Current Status Info -->
+    <div class="detail-card mb-3">
+      <div class="section-title">Assignment Info</div>
+      {% if complaint.assigned_department %}
+      <div class="p-2 bg-success bg-opacity-10 border border-success rounded mb-2">
+        <small class="text-success fw-semibold"><i class="fas fa-building me-1"></i>Assigned to:</small>
+        <div class="fw-semibold">{{ complaint.assigned_department }}</div>
+      </div>
+      {% endif %}
+      {% if complaint.admin_remarks %}
+      <div class="p-2 bg-warning bg-opacity-10 border border-warning rounded">
+        <small class="text-warning fw-semibold"><i class="fas fa-comment-dots me-1"></i>Admin Remarks:</small>
+        <div class="small mt-1">{{ complaint.admin_remarks }}</div>
+      </div>
+      {% endif %}
+      {% if not complaint.assigned_department and not complaint.admin_remarks %}
+      <div class="text-muted small text-center py-2">No assignment or remarks yet.</div>
+      {% endif %}
+    </div>
+
+    <!-- Actions -->
+    <div class="action-panel mb-3">
+      <div class="action-panel-header"><i class="fas fa-cogs me-2 text-primary"></i>Actions</div>
+      <div class="action-panel-body">
+
+        <!-- Nav Tabs -->
+        <ul class="nav nav-tabs action-tabs mb-3" id="actionTabs">
+          <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#tabVerify">Verify</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#tabAssign">Assign</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#tabStatus">Status</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#tabRemarks">Remarks</a>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <!-- Verify Tab -->
+          <div class="tab-pane fade show active" id="tabVerify">
+            <form method="POST" action="{{ url_for('admin_update_complaint', complaint_pk=complaint.id) }}">
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Admin Remarks (optional)</label>
+                <textarea class="form-control form-control-sm" name="remarks" rows="3" placeholder="Add verification notes...">{{ complaint.admin_remarks or '' }}</textarea>
+              </div>
+              <div class="d-grid gap-2">
+                <button type="submit" name="action" value="verify" class="btn btn-success btn-sm py-2">
+                  <i class="fas fa-check-circle me-1"></i>Verify Complaint
+                </button>
+                <button type="submit" name="action" value="reject"
+                  class="btn btn-outline-danger btn-sm"
+                  onclick="return confirm('Reject and close this complaint?')">
+                  <i class="fas fa-times-circle me-1"></i>Reject & Close
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Assign Tab -->
+          <div class="tab-pane fade" id="tabAssign">
+            <form method="POST" action="{{ url_for('admin_update_complaint', complaint_pk=complaint.id) }}">
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Select Department *</label>
+                <select class="form-select form-select-sm" name="department" required>
+                  <option value="">Choose department...</option>
+                  {% for d in departments %}
+                  <option value="{{ d }}" {% if complaint.assigned_department == d %}selected{% endif %}>{{ d }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Assignment Notes</label>
+                <textarea class="form-control form-control-sm" name="remarks" rows="2" placeholder="Notes for department...">{{ complaint.admin_remarks or '' }}</textarea>
+              </div>
+              <button type="submit" name="action" value="assign" class="btn btn-primary btn-sm w-100 py-2">
+                <i class="fas fa-building me-1"></i>Assign Department
+              </button>
+            </form>
+          </div>
+
+          <!-- Status Tab -->
+          <div class="tab-pane fade" id="tabStatus">
+            <form method="POST" action="{{ url_for('admin_update_complaint', complaint_pk=complaint.id) }}">
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Update Status *</label>
+                <select class="form-select form-select-sm" name="status" required>
+                  {% for s in statuses %}
+                  <option value="{{ s }}" {% if complaint.status == s %}selected{% endif %}>{{ s }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Remarks</label>
+                <textarea class="form-control form-control-sm" name="remarks" rows="2" placeholder="Reason for status change...">{{ complaint.admin_remarks or '' }}</textarea>
+              </div>
+              <button type="submit" name="action" value="update_status" class="btn btn-warning btn-sm w-100 py-2 text-dark">
+                <i class="fas fa-sync me-1"></i>Update Status
+              </button>
+            </form>
+          </div>
+
+          <!-- Remarks Tab -->
+          <div class="tab-pane fade" id="tabRemarks">
+            <form method="POST" action="{{ url_for('admin_update_complaint', complaint_pk=complaint.id) }}">
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Admin Remarks</label>
+                <textarea class="form-control form-control-sm" name="remarks" rows="4" placeholder="Add or update remarks...">{{ complaint.admin_remarks or '' }}</textarea>
+              </div>
+              <button type="submit" name="action" value="add_remarks" class="btn btn-secondary btn-sm w-100 py-2">
+                <i class="fas fa-save me-1"></i>Save Remarks
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Repair Update -->
+    <div class="action-panel">
+      <div class="action-panel-header"><i class="fas fa-hard-hat me-2 text-warning"></i>Add Repair Update</div>
+      <div class="action-panel-body">
+        <form method="POST" action="{{ url_for('admin_add_repair_update', complaint_pk=complaint.id) }}" enctype="multipart/form-data">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Status After Update</label>
+            <select class="form-select form-select-sm" name="status">
+              {% for s in statuses %}
+              <option value="{{ s }}" {% if complaint.status == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Update Date</label>
+            <input type="date" class="form-control form-control-sm" name="update_date"
+                   value="{{ now().strftime('%Y-%m-%d') if now else '' }}">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Repair Notes *</label>
+            <textarea class="form-control form-control-sm" name="remarks" rows="3" placeholder="Describe the repair work done..." required></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Repair Photo (optional)</label>
+            <input type="file" class="form-control form-control-sm" name="repair_image" accept="image/*">
+          </div>
+          <button type="submit" class="btn btn-warning btn-sm w-100 py-2 text-dark fw-semibold">
+            <i class="fas fa-plus-circle me-1"></i>Add Repair Update
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+{% if complaint.latitude and complaint.longitude %}
+const map = L.map('detailMap').setView([{{ complaint.latitude }}, {{ complaint.longitude }}], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+L.marker([{{ complaint.latitude }}, {{ complaint.longitude }}])
+  .addTo(map)
+  .bindPopup('<b>{{ complaint.complaint_id }}</b><br>{{ complaint.address }}')
+  .openPopup();
+{% endif %}
+</script>
+{% endblock %}
